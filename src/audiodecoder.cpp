@@ -88,7 +88,10 @@ bool AudioDecoder::setConvertingParameters(AVSampleFormat destSampleFormat, int6
 	if(codecContext) {
 		destChLayuot = destChLayuot == -1 ? static_cast<int64_t>(codecContext->channel_layout) : destChLayuot;
 		destSampleRate = destSampleRate == -1 ? codecContext->sample_rate : destSampleRate;
-		if(destChLayuot <= 0 || destSampleRate <= 0 || codecContext->channel_layout == 0 || destSampleFormat == AVSampleFormat::AV_SAMPLE_FMT_NONE
+		if(destChLayuot == 0) {
+			destChLayuot = AV_CH_LAYOUT_MONO;
+		}
+		if(destChLayuot < 0 || destSampleRate <= 0 || destSampleFormat == AVSampleFormat::AV_SAMPLE_FMT_NONE
 		   || codecContext->sample_rate <= 0 || codecContext->sample_fmt == AVSampleFormat::AV_SAMPLE_FMT_NONE) {
 			destSample_rate = destSampleRate;
 			destCh_layuot = destChLayuot;
@@ -99,6 +102,9 @@ bool AudioDecoder::setConvertingParameters(AVSampleFormat destSampleFormat, int6
 				convertContext = nullptr;
 			}
 			return true;
+		}
+		if(codecContext->channel_layout == 0) {
+			codecContext->channel_layout = AV_CH_LAYOUT_MONO;
 		}
 		newContext = swr_alloc_set_opts(nullptr,
 								destChLayuot,		 // out_ch_layout
@@ -135,6 +141,9 @@ bool AudioDecoder::setConvertingParameters(AVSampleFormat destSampleFormat, int6
 		destSample_rate = destSampleRate;
 		destCh_layuot = destChLayuot;
 		destSample_format = destSampleFormat;
+		if(static_cast<int64_t>(codecContext->channel_layout) == 0) {
+			codecContext->channel_layout = AV_CH_LAYOUT_MONO;
+		}
 		reconvertAll(oldSample_format, oldSample_rate, oldCh_layuot);
 	}
 	srcSample_rate = codecContext->sample_rate;
@@ -198,9 +207,12 @@ bool AudioDecoder::convertFrame(AVFrame* dest, AVFrame* source) {
 		}
 	}
 	if(convertContext == nullptr) {
-		if(codecContext->channel_layout > 0 && codecContext->sample_rate > 0 && codecContext->sample_fmt != AVSampleFormat::AV_SAMPLE_FMT_NONE) {
+		if(codecContext->sample_rate > 0 && codecContext->sample_fmt != AVSampleFormat::AV_SAMPLE_FMT_NONE) {
 			if(destSample_rate <= 0) {
 				destSample_rate = codecContext->sample_rate;
+			}
+			if(codecContext->channel_layout == 0) {
+				codecContext->channel_layout = AV_CH_LAYOUT_MONO;
 			}
 			if(destCh_layuot <= 0) {
 				destCh_layuot = static_cast<int64_t>(codecContext->channel_layout);
