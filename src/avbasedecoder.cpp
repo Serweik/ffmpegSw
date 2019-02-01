@@ -1,4 +1,4 @@
-﻿#include "avabstactdecoder.h"
+﻿#include "avbasedecoder.h"
 
 AVBaseDecoder::~AVBaseDecoder() {
 	stop();
@@ -80,12 +80,12 @@ bool AVBaseDecoder::pushPacket(AVPacket* newPacket) {
 
 	std::unique_lock<std::mutex> packLocker(packetMutex);
 	if(stopping) return false;
-	if(((packetWriteIndex < packetReadIndex) && (packetReadIndex - packetWriteIndex < ((static_cast<float>(packet.size()) / 100) * 7)))
-	 ||((packetWriteIndex > packetReadIndex) && (packetWriteIndex - packetReadIndex > ((static_cast<float>(packet.size()) / 100) * 93)))) {
+	if(((packetWriteIndex < packetReadIndex) && (packetReadIndex - packetWriteIndex < 10)) //free space in the buffer is less then 6 items
+	 ||((packetWriteIndex > packetReadIndex) && (packetWriteIndex - packetReadIndex > packetsBufferSize - 10))) { //free space in the buffer is less then 6 items
 		packetCond.wait(packLocker, [&](){
 			return (packetWriteIndex == packetReadIndex)
-					|| (((packetWriteIndex < packetReadIndex) && (packetReadIndex - packetWriteIndex > ((static_cast<float>(packet.size()) / 100) * 7)))
-					 || ((packetWriteIndex > packetReadIndex) && (packetWriteIndex - packetReadIndex < ((static_cast<float>(packet.size()) / 100) * 93))))
+					|| (((packetWriteIndex < packetReadIndex) && (packetReadIndex - packetWriteIndex > 10)) //the buffer has free item
+					 || ((packetWriteIndex > packetReadIndex) && (packetWriteIndex - packetReadIndex < packetsBufferSize - 10)))//the buffer has free item
 					|| stopping;});
 		if(stopping) {
 			return false;
@@ -143,18 +143,18 @@ void AVBaseDecoder::decoding() {
 		packLocker.unlock();
 		packetCond.notify_one();
 		if(result != 0) {
-			break;
+			continue;
 		}
 		result = avcodec_receive_frame(codecContext, frameforDecoding);
 		if(result == 0) {
 			if(stopping) return;
 
-			if(((frameWriteIndex < frameReadIndex) && (frameReadIndex - frameWriteIndex < ((static_cast<float>(frame.size()) / 100) * 7)))
-			 ||((frameWriteIndex > frameReadIndex) && (frameWriteIndex - frameReadIndex > ((static_cast<float>(frame.size()) / 100) * 93)))) {
+			if(((frameWriteIndex < frameReadIndex) && (frameReadIndex - frameWriteIndex < 6))//free space in the buffer is less then 6 items
+			 ||((frameWriteIndex > frameReadIndex) && (frameWriteIndex - frameReadIndex > framesBufferSize - 6))) {//free space in the buffer is less then 6 items
 				frameCond.wait(frameLocker, [&](){
 					return (frameWriteIndex == frameReadIndex)
-							|| (((frameWriteIndex < frameReadIndex) && (frameReadIndex - frameWriteIndex > ((static_cast<float>(frame.size()) / 100) * 7)))
-							 || ((frameWriteIndex > frameReadIndex) && (frameWriteIndex - frameReadIndex < ((static_cast<float>(frame.size()) / 100) * 93))))
+							|| (((frameWriteIndex < frameReadIndex) && (frameReadIndex - frameWriteIndex > 6))//the buffer has free item
+							 || ((frameWriteIndex > frameReadIndex) && (frameWriteIndex - frameReadIndex < framesBufferSize - 6)))//the buffer has free item
 							|| stopping;});
 				if(stopping) {
 					return;

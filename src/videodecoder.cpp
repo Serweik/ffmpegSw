@@ -9,7 +9,7 @@ VideoDecoder::~VideoDecoder() {
 
 bool VideoDecoder::start() {
 	timeInitialized = false;
-	needSinchronyzeToAudio = false;
+	needSynchronizeToAudio = false;
 	audioLastPts = 0.0;
 	audioLastPtsCheckTime = 0;
 	lastTime = 0;
@@ -64,17 +64,22 @@ bool VideoDecoder::getData(uint8_t** data, int* linesize) {
 			startTime = now;
 		}
 
-		if(needSinchronyzeToAudio) {
-			audioLastPts += (now - audioLastPtsCheckTime) / 1000000;
-			audioLastPts -= audioRtspDiferencePts;
+		std::unique_lock<std::mutex> synchLocker(synchronizeMutex);
+		if(needSynchronizeToAudio) {
+			audioLastPts += static_cast<double>((now - audioLastPtsCheckTime)) / 1000000;
+			audioLastPtsCheckTime = now;
+			if(audioPtsIdUpdated) {
+				audioLastPts -= audioRtspDiferencePts;
+				audioPtsIdUpdated = false;
+			}
 			double diff = (audioLastPts - pts) * 1000000.0;
-			if((diff >= -2000) && (diff <= 2000)) {
+			if((diff >= -10000) && (diff <= 10000)) {
 				stabilized = true;
-			}else if((diff < -100000) || (diff > 100000)) {
+			}else if((diff < -300000) || (diff > 300000)) {
 				stabilized = false;
 			}else if(stabilized) {
-				diff = diff > 2000 ? 2000
-								   : diff < -2000 ? -2000
+				diff = diff > 10000 ? 10000
+								   : diff < -10000 ? -10000
 												  : diff;
 			}
 			diffPts = static_cast<int64_t>(diff);
@@ -84,6 +89,7 @@ bool VideoDecoder::getData(uint8_t** data, int* linesize) {
 			double diff = (now - startTime) - (nextTime * 1000000);
 			diffPts = static_cast<int64_t>(diff);
 		}
+		synchLocker.unlock();
 
 		double frameDelay = av_q2d(codecContext->time_base);
 		frameDelay = static_cast<double>(decodedFrame->repeat_pict) * (frameDelay * 0.5); //@TODO delay = repeat_pict / 2 * fps
@@ -143,17 +149,22 @@ bool VideoDecoder::getData(uint8_t* data, int dataSize) {
 			startTime = now;
 		}
 
-		if(needSinchronyzeToAudio) {
-			audioLastPts += (now - audioLastPtsCheckTime) / 1000000;
-			audioLastPts -= audioRtspDiferencePts;
+		std::unique_lock<std::mutex> synchLocker(synchronizeMutex);
+		if(needSynchronizeToAudio) {
+			audioLastPts += static_cast<double>((now - audioLastPtsCheckTime)) / 1000000;
+			audioLastPtsCheckTime = now;
+			if(audioPtsIdUpdated) {
+				audioLastPts -= audioRtspDiferencePts;
+				audioPtsIdUpdated = false;
+			}
 			double diff = (audioLastPts - pts) * 1000000.0;
-			if((diff >= -2000) && (diff <= 2000)) {
+			if((diff >= -10000) && (diff <= 10000)) {
 				stabilized = true;
-			}else if((diff < -100000) || (diff > 100000)) {
+			}else if((diff < -300000) || (diff > 300000)) {
 				stabilized = false;
 			}else if(stabilized) {
-				diff = diff > 2000 ? 2000
-								   : diff < -2000 ? -2000
+				diff = diff > 10000 ? 10000
+								   : diff < -10000 ? -10000
 												  : diff;
 			}
 			diffPts = static_cast<int64_t>(diff);
@@ -163,6 +174,7 @@ bool VideoDecoder::getData(uint8_t* data, int dataSize) {
 			double diff = (now - startTime) - (nextTime * 1000000);
 			diffPts = static_cast<int64_t>(diff);
 		}
+		synchLocker.unlock();
 
 		double frameDelay = av_q2d(codecContext->time_base);
 		frameDelay = static_cast<double>(decodedFrame->repeat_pict) * (frameDelay * 0.5); //@TODO delay = repeat_pict / 2 * fps
@@ -251,12 +263,13 @@ bool VideoDecoder::setConvertingParameters(AVPixelFormat dstFormat, int flags, i
 }
 
 void VideoDecoder::setAudioPts(double newAudioLastPts, int64_t checkTime, double newRtspDifferencePts) {
-	std::unique_lock<std::mutex> frameLocker(frameMutex);
+	std::unique_lock<std::mutex> synchLocker(synchronizeMutex);
 	if(stopping) return;
 	audioLastPts = newAudioLastPts;
 	audioRtspDiferencePts = newRtspDifferencePts;
 	audioLastPtsCheckTime = checkTime;
-	needSinchronyzeToAudio = true;
+	needSynchronizeToAudio = true;
+	audioPtsIdUpdated = true;
 }
 
 int VideoDecoder::getSourceWidth() {

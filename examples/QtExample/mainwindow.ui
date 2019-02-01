@@ -22,6 +22,9 @@
       </property>
       <item>
        <widget class="QLineEdit" name="pathToSource">
+        <property name="text">
+         <string/>
+        </property>
         <property name="placeholderText">
          <string>path</string>
         </property>

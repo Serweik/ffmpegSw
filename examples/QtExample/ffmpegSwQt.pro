@@ -5,6 +5,7 @@
 #-------------------------------------------------
 
 QT       += core gui
+QT		 += multimedia
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -34,21 +35,21 @@ SOURCES += \
         main.cpp \
         mainwindow.cpp \
     ../../src/audiodecoder.cpp \
-    ../../src/avabstractdecoder.cpp \
     ../../src/avffmpegwrapper.cpp \
     ../../src/avfilecontext.cpp \
     ../../src/videodecoder.cpp \
-    camera.cpp
+    camera.cpp \
+    ../../src/avbasedecoder.cpp
 
 HEADERS += \
         mainwindow.h \
     ../../src/audiodecoder.h \
-    ../../src/avabstactdecoder.h \
     ../../src/avffmpegwrapper.h \
     ../../src/avfilecontext.h \
     ../../src/avitemcontainer.h \
     ../../src/videodecoder.h \
-    camera.h
+    camera.h \
+    ../../src/avbasedecoder.h
 
 FORMS += \
         mainwindow.ui

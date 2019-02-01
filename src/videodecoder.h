@@ -1,7 +1,7 @@
 #ifndef VIDEODECODER_H
 #define VIDEODECODER_H
 
-#include "avabstactdecoder.h"
+#include "avbasedecoder.h"
 
 extern "C" {
 	#include <libswscale/swscale.h>
@@ -47,8 +47,10 @@ class VideoDecoder: public AVBaseDecoder {
 		double audioLastPts = 0.0;
 		double audioRtspDiferencePts = 0.0;
 		int64_t audioLastPtsCheckTime = 0;
-		bool needSinchronyzeToAudio = false;
+		bool needSynchronizeToAudio = false;
+		bool audioPtsIdUpdated = false;
 		bool stabilized = false;
+		std::mutex synchronizeMutex;
 
 		virtual bool convertFrame(AVFrame* dest, AVFrame* source) override;
 		void reconvertAll(AVPixelFormat oldPixFormat, int oldWidth, int oldHeight);

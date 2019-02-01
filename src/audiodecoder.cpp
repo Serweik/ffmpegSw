@@ -32,6 +32,7 @@ uint32_t AudioDecoder::getData(uint8_t* data, uint32_t requairedDataSize) {
 	uint32_t givenSize = 0;
 	std::unique_lock<std::mutex> frameLocker(frameMutex);
 	if(stopping) return 0;
+
 	AVFrame* decodedFrame = frame[static_cast<unsigned>(frameReadIndex)].getPtr();
 	double pts = decodedFrame->pkt_dts;
 	if(pts == AV_NOPTS_VALUE) {
@@ -39,7 +40,7 @@ uint32_t AudioDecoder::getData(uint8_t* data, uint32_t requairedDataSize) {
 	}
 	if(pts != AV_NOPTS_VALUE) {
 		pts *= av_q2d(stream->time_base);
-		if(lastPts == 0.0 && pts > 0.5) {
+		if(lastPts == 0.0 && frameReadIndex == 0 && pts > 0.5) {
 			rtspDifferencePts = pts;
 		}else if(lastPts > pts) {
 			rtspDifferencePts = 0;
@@ -152,7 +153,7 @@ bool AudioDecoder::setConvertingParameters(AVSampleFormat destSampleFormat, int6
 	return true;
 }
 
-int AudioDecoder::getSampleRate() {
+int AudioDecoder::getSrcSampleRate() {
 	std::unique_lock<std::mutex> frameLocker(frameMutex);
 	if(!codecContext) {
 		return -1;
@@ -160,7 +161,7 @@ int AudioDecoder::getSampleRate() {
 	return codecContext->sample_rate;
 }
 
-int AudioDecoder::getChannels() {
+int AudioDecoder::getSrcChannels() {
 	std::unique_lock<std::mutex> frameLocker(frameMutex);
 	if(!codecContext) {
 		return -1;
@@ -168,10 +169,21 @@ int AudioDecoder::getChannels() {
 	return codecContext->channels;
 }
 
+AVSampleFormat AudioDecoder::getDestSampleFormat() {
+	return destSample_format;
+}
+
+int AudioDecoder::getDestChannels() {
+	return destCh_layuot > 0 ? av_get_channel_layout_nb_channels(static_cast<uint64_t>(destCh_layuot)) : 0;
+}
+
+int AudioDecoder::getDestSampleRate() {
+	return destSample_rate;
+}
+
 uint32_t AudioDecoder::getDataFromFrame(AVFrame* decodedFrame, bool& isEmpty, uint8_t* data, uint32_t requairedDataSize) {
 	uint32_t linesize = static_cast<uint32_t>(av_get_bytes_per_sample(static_cast<AVSampleFormat>(decodedFrame->format)) * decodedFrame->nb_samples);
 	uint32_t fullSize = static_cast<uint32_t>(decodedFrame->channels) * linesize;
-
 	uint32_t copyedSize = 0;
 	if(!av_sample_fmt_is_planar(static_cast<AVSampleFormat>(decodedFrame->format))) {
 		uint32_t copySize = std::min(requairedDataSize, fullSize - frameDataGivenAway);
@@ -264,12 +276,12 @@ void AudioDecoder::reconvertAll(AVSampleFormat oldSample_format, int oldSample_r
 													destSample_format,    // out_sample_fmt
 													destSample_rate,      // out_sample_rate
 													oldCh_layuot,		// in_ch_layout
-													oldSample_format,			// in_sample_fmt
+													oldSample_format,		// in_sample_fmt
 													oldSample_rate,			// in_sample_rate
 													0,                    // log_offset
 													nullptr);             // log_ctx
 			if(tempContext != nullptr) {
-				swr_init(tempContext);
+				int res = swr_init(tempContext);
 				good = true;
 				for(int isign = frameReadIndex; std::abs(isign - frameWriteIndex) > 0; ++ isign) { //rescale already decoded frames
 					AVFrame* dest = av_frame_alloc();
@@ -285,14 +297,18 @@ void AudioDecoder::reconvertAll(AVSampleFormat oldSample_format, int oldSample_r
 					dest->format = destSample_format;
 					dest->pkt_dts = frame[i].getPtr()->pkt_dts;
 					dest->pts = frame[i].getPtr()->pts;
-					swr_convert_frame(convertContext, dest, frame[i].getPtr());
+					res = swr_convert_frame(convertContext, dest, frame[i].getPtr());
 					int linesize = av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame[i].getPtr()->format)) * frame[i].getPtr()->nb_samples;
 					dataSize -= static_cast<unsigned>(linesize * frame[i].getPtr()->channels) - frameDataGivenAway;
 					frameDataGivenAway = 0;
 					ftameDataPtrIndex = 0;
 					frame[i].resetPtr();
-					frame[i].setReferencedPtr(dest);
-					frame[i].doSomething();
+					if(res == 0) {
+						frame[i].setReferencedPtr(dest);
+						frame[i].doSomething();
+					}else {
+						frame[i].setReferencedPtr(dest);
+					}
 					dest = nullptr;
 					if(static_cast<unsigned>(isign) >= frame.size() - 1) {
 						isign = -1;
@@ -319,12 +335,12 @@ void AudioDecoder::handleEndOfFile(std::unique_lock<std::mutex>& frameLocker) {
 	if(swr_get_delay(convertContext, 1000) > 0) {
 		if(stopping) return;
 
-		if(((frameWriteIndex < frameReadIndex) && (frameReadIndex - frameWriteIndex < ((static_cast<float>(frame.size()) / 100) * 7)))
-		 ||((frameWriteIndex > frameReadIndex) && (frameWriteIndex - frameReadIndex > ((static_cast<float>(frame.size()) / 100) * 93)))) {
+		if(((frameWriteIndex < frameReadIndex) && (frameReadIndex - frameWriteIndex < 6))//free space in the buffer is less then 6 items
+		 ||((frameWriteIndex > frameReadIndex) && (frameWriteIndex - frameReadIndex > framesBufferSize - 6))) {//free space in the buffer is less then 6 items
 			frameCond.wait(frameLocker, [&](){
 				return (frameWriteIndex == frameReadIndex)
-						|| (((frameWriteIndex < frameReadIndex) && (frameReadIndex - frameWriteIndex > ((static_cast<float>(frame.size()) / 100) * 7)))
-						 || ((frameWriteIndex > frameReadIndex) && (frameWriteIndex - frameReadIndex < ((static_cast<float>(frame.size()) / 100) * 93))))
+						|| (((frameWriteIndex < frameReadIndex) && (frameReadIndex - frameWriteIndex > 6)) //the buffer has free item
+						 || ((frameWriteIndex > frameReadIndex) && (frameWriteIndex - frameReadIndex < framesBufferSize - 6))) //the buffer has free item
 						|| stopping;});
 			if(stopping) {
 				return;

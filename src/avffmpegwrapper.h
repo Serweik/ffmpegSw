@@ -19,6 +19,7 @@ class AVffmpegWrapper {
 		bool setVideoConvertingParameters(int fileDescriptor, enum AVPixelFormat dstFormat, int flags, int dstW = -1, int dstH = -1);
 		bool setAudioConvertingParameters(int fileDescriptor, AVSampleFormat destSampleFormat, int64_t destChLayuot = -1, int destSampleRate = -1);
 		void setPlayingMode(int fileDescriptor, AVfileContext::PlayingMode newPlayingMode);
+		void setAudioCallback(int fileDescriptor, std::function<void(uint8_t*, uint32_t, int&)> audioCallback, int32_t audioSamplesNum);
 		bool startReading(int fileDescriptor);
 		bool isReading(int fileDescriptor);
 		bool isDecodingVideo(int fileDescriptor);

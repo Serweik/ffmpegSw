@@ -11,8 +11,7 @@
 #include <QImage>
 #include <QSize>
 #include <QSharedPointer>
-
-#include <QDebug>
+#include <QAudioOutput>
 
 class Camera: public QWidget {
 	Q_OBJECT
@@ -28,9 +27,15 @@ class Camera: public QWidget {
 		QSharedPointer<AVffmpegWrapper> aVffmpegWrapper;
 		QString path;
 		int renderingTimer = -1;
-		uint8_t* buffer = nullptr;
-		int bufsize = 0;
+		uint8_t* videoBuffer = nullptr;
+		int videoBufsize = 0;
 		int imageWidth = 0;
+
+		QAudioOutput* audioOutput = nullptr;
+		QIODevice* audioDevice = nullptr;
+		int audioBufsize = 0;
+		QAudioFormat format;
+		int numSamples = 0;
 
 	// QObject interface
 	protected:

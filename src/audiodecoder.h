@@ -1,7 +1,7 @@
 #ifndef AUDIODECODER_H
 #define AUDIODECODER_H
 
-#include "avabstactdecoder.h"
+#include "avbasedecoder.h"
 
 extern "C" {
 	#include <libswresample/swresample.h>
@@ -21,8 +21,11 @@ class AudioDecoder: public AVBaseDecoder {
 		double getRtspDifferencePts();
 		int64_t getLastPtsCheckTime();
 		bool setConvertingParameters(AVSampleFormat destSampleFormat, int64_t destChLayuot = -1, int destSampleRate = -1);
-		int getSampleRate();
-		int getChannels();
+		int getSrcSampleRate();
+		int getSrcChannels();
+		AVSampleFormat getDestSampleFormat();
+		int getDestChannels();
+		int getDestSampleRate();
 
 	protected:
 		SwrContext* convertContext = nullptr;

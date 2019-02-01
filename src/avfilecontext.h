@@ -32,6 +32,7 @@ class AVfileContext {
 		bool setVideoConvertingParameters(AVPixelFormat dstFormat, int flags, int dstW = -1, int dstH = -1);
 		bool setAudioConvertingParameters(AVSampleFormat destSampleFormat, int64_t destChLayuot = -1, int destSampleRate = -1);
 		void setPlayingMode(PlayingMode newPlayingMode);
+		void setAudioCallback(std::function<void(uint8_t* buffer, uint32_t len, int& writed)> audioCallback, int32_t audioSamplesNum);
 		bool startReading();
 		bool isReading();
 		bool isDecodingVideo();
@@ -65,6 +66,14 @@ class AVfileContext {
 		PlayingMode playingMode = NORMAL;
 		int streamType = VIDEO | AUDIO;
 
+		std::function<void(uint8_t* buffer, uint32_t len, int& writed)> audioCallback = nullptr;
+		int32_t audioSamplesNum =  1024;
+		std::thread audioPlayingThread;
+		bool audioPlayingThreadIsRunning = false;
+		bool audioPlayingThreadIsStopping = false;
+		std::mutex safeAudioCallbackMutex;
+
+		void audioPlaying();
 		void stopReading();
 		void reading();
 		bool fallHandle();

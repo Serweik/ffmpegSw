@@ -137,6 +137,17 @@ void AVffmpegWrapper::setPlayingMode(int fileDescriptor, AVfileContext::PlayingM
 	}
 }
 
+void AVffmpegWrapper::setAudioCallback(int fileDescriptor, std::function<void(uint8_t*, uint32_t, int&)> audioCallback, int32_t audioSamplesNum) {
+	std::unique_lock<std::mutex> locker(avFileMutex);
+	int temp = 0;
+	++ threadCounter;
+	std::unique_ptr<int, decltype(threadCounterDecrement)> decrementer(&temp, threadCounterDecrement);
+	locker.unlock();
+	if(avFiles.find(fileDescriptor) != avFiles.end()) {
+		avFiles[fileDescriptor]->setAudioCallback(audioCallback, audioSamplesNum);
+	}
+}
+
 bool AVffmpegWrapper::startReading(int fileDescriptor) {
 	std::unique_lock<std::mutex> locker(avFileMutex);
 	int temp = 0;
