@@ -12,6 +12,7 @@
 #include <QSize>
 #include <QSharedPointer>
 #include <QAudioOutput>
+#include <QByteArray>
 
 class Camera: public QWidget {
 	Q_OBJECT
@@ -22,6 +23,9 @@ class Camera: public QWidget {
 		void setPath(QString path);
 		bool start();
 
+	private slots:
+		void feedAudioOutput();
+
 	private:
 		int fileDescriptor = -1;
 		QSharedPointer<AVffmpegWrapper> aVffmpegWrapper;
@@ -31,11 +35,18 @@ class Camera: public QWidget {
 		int videoBufsize = 0;
 		int imageWidth = 0;
 
+		QByteArray audioSamplesBuffer;
+		int numSamples = 0;
+		int audioBufsize = 0;
+		double sampleRate = 0.0;
 		QAudioOutput* audioOutput = nullptr;
 		QIODevice* audioDevice = nullptr;
-		int audioBufsize = 0;
 		QAudioFormat format;
-		int numSamples = 0;
+		std::thread audioPlayingThread;
+		std::mutex audioSamplesMutex;
+		bool audioPlayingThreadIsRunning = false;
+		bool audioPlayingThreadIsStopping = false;
+		void audioPlaying();
 
 	// QObject interface
 	protected:

@@ -73,13 +73,13 @@ bool VideoDecoder::getData(uint8_t** data, int* linesize) {
 				audioPtsIdUpdated = false;
 			}
 			double diff = (audioLastPts - pts) * 1000000.0;
-			if((diff >= -10000) && (diff <= 10000)) {
+			if((diff >= -2000) && (diff <= 2000)) {
 				stabilized = true;
-			}else if((diff < -300000) || (diff > 300000)) {
+			}else if((diff < -100000) || (diff > 100000)) {
 				stabilized = false;
 			}else if(stabilized) {
-				diff = diff > 10000 ? 10000
-								   : diff < -10000 ? -10000
+				diff = diff > 2000 ? 2000
+								   : diff < -2000 ? -2000
 												  : diff;
 			}
 			diffPts = static_cast<int64_t>(diff);
@@ -158,13 +158,13 @@ bool VideoDecoder::getData(uint8_t* data, int dataSize) {
 				audioPtsIdUpdated = false;
 			}
 			double diff = (audioLastPts - pts) * 1000000.0;
-			if((diff >= -10000) && (diff <= 10000)) {
+			if((diff >= -2000) && (diff <= 2000)) {
 				stabilized = true;
-			}else if((diff < -300000) || (diff > 300000)) {
+			}else if((diff < -100000) || (diff > 100000)) {
 				stabilized = false;
 			}else if(stabilized) {
-				diff = diff > 10000 ? 10000
-								   : diff < -10000 ? -10000
+				diff = diff > 2000 ? 2000
+								   : diff < -2000 ? -2000
 												  : diff;
 			}
 			diffPts = static_cast<int64_t>(diff);

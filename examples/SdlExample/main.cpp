@@ -36,9 +36,9 @@ static void audio_callback(void* userdata, uint8_t* stream, int len) {
 }
 
 int main() {
-	int width = 800;
-	int height = 480;
-	std::string path = "rtsp://184.72.239.149/vod/mp4:BigBuckBunny_115k.mov";
+	int width = 1920;
+	int height = 1080;
+	std::string path = "D:/фильмы/Deadpool 2 (2018) [Super Duper Cut].1080p.BluRay.10-bit.x265.mkv";
 	int fileDescriptor = aVffmpegWrapper.openFile(path, AVfileContext::REPEATE_AND_RECONNECT, AVfileContext::VIDEO | AVfileContext::AUDIO);
 	if(fileDescriptor == -1) {
 		std::cout << "can't open file " << std::endl;
@@ -49,7 +49,7 @@ int main() {
 		std::cout << "error setVideoConvertingParameters " << std::endl;
 		return -1;
 	}
-	if(!aVffmpegWrapper.setAudioConvertingParameters(fileDescriptor, AV_SAMPLE_FMT_S16, AV_CH_LAYOUT_STEREO)) {
+	if(!aVffmpegWrapper.setAudioConvertingParameters(fileDescriptor, AV_SAMPLE_FMT_S16, AV_CH_LAYOUT_STEREO, 48000)) {
 		std::cout << "error setAudioConvertingParameters " << std::endl;
 		return -1;
 	}

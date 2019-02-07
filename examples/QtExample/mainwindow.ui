@@ -23,7 +23,7 @@
       <item>
        <widget class="QLineEdit" name="pathToSource">
         <property name="text">
-         <string/>
+         <string>D:/фильмы/Deadpool 2 (2018) [Super Duper Cut].1080p.BluRay.10-bit.x265.mkv</string>
         </property>
         <property name="placeholderText">
          <string>path</string>

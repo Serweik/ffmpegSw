@@ -43,7 +43,7 @@ class AVBaseDecoder {
 		bool stopping = false;
 		bool endOfFile = false;
 
-		static const int packetsBufferSize = 50;
+		static const int packetsBufferSize = 64;
 		std::array<AVPacketType, packetsBufferSize> packet;
 		int packetWriteIndex = 0;
 		int packetReadIndex = 0;
@@ -51,7 +51,7 @@ class AVBaseDecoder {
 		std::condition_variable packetCond;
 
 		std::thread decodingThread;
-		static const int framesBufferSize = 46;
+		static const int framesBufferSize = 64;
 		std::array<AVFrameType, framesBufferSize> frame;
 		int frameWriteIndex = 0;
 		int frameReadIndex = 0;

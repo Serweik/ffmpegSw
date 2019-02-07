@@ -1,5 +1,5 @@
 TEMPLATE = app
-CONFIG += c++17
+CONFIG += c++11
 CONFIG += console
 CONFIG -= c
 CONFIG -= qt
@@ -19,14 +19,14 @@ SOURCES += \
         main.cpp \
     ../../src/avffmpegwrapper.cpp \
     ../../src/avfilecontext.cpp \
-    ../../src/avabstractdecoder.cpp \
+    ../../src/avbasedecoder.cpp \
     ../../src/videodecoder.cpp \
     ../../src/audiodecoder.cpp
 
 HEADERS += \
     ../../src/avffmpegwrapper.h \
     ../../src/avfilecontext.h \
-    ../../src/avabstactdecoder.h \
+    ../../src/avbasedecoder.h \
     ../../src/avitemcontainer.h \
     ../../src/videodecoder.h \
     ../../src/audiodecoder.h

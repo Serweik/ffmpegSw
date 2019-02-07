@@ -94,8 +94,8 @@ bool AVfileContext::openFile(const std::string& path, PlayingMode playingMode, i
 				avcodec_free_context(&audioCodecContext);
 				return false;
 			}
-			audioDecoder.setStreamAndCodecContext(vstrm, audioCodecContext);
 			audioDecoder.init();
+			audioDecoder.setStreamAndCodecContext(vstrm, audioCodecContext);
 			if(audioCallback != nullptr) {
 				audioPlayingThreadIsRunning = true;
 				audioPlayingThreadIsStopping = false;
@@ -109,14 +109,14 @@ bool AVfileContext::openFile(const std::string& path, PlayingMode playingMode, i
 
 void AVfileContext::closeFile() {
 	std::lock_guard<std::mutex> lock(safeReplayMutex);
-	videoDecoder.stop();
-	audioDecoder.stop();
 	if(audioPlayingThreadIsRunning) {
 		audioPlayingThreadIsStopping = true;
 		if(audioPlayingThread.joinable()) {
 			audioPlayingThread.join();
 		}
 	}
+	videoDecoder.stop();
+	audioDecoder.stop();
 	stopReading();
 	if(avFormatContext) {
 		avformat_close_input(&avFormatContext);
@@ -175,7 +175,8 @@ void AVfileContext::setAudioCallback(std::function<void(uint8_t*, uint32_t, int&
 		if(audioCallback != nullptr) {
 			this->audioCallback = audioCallback;
 			this->audioSamplesNum = audioSamplesNum;
-			if(audioStreamId != -1) {
+			if(audioDecoder.isReady()) {
+				std::cout << "start play" << std::endl;
 				audioPlayingThreadIsRunning = true;
 				audioPlayingThreadIsStopping = false;
 				audioPlayingThread = std::thread(&AVfileContext::audioPlaying, this);
@@ -286,24 +287,36 @@ bool AVfileContext::hasVideoStream() {
 }
 
 bool AVfileContext::hasAudioStream() {
-	return audioDecoder.isReady();
+	return audioDecoder.isReady() && audioDecoder.availableData();
 }
 
 void AVfileContext::audioPlaying() {
-	uint32_t bytesPerSample = static_cast<uint32_t>(av_get_bytes_per_sample(audioDecoder.getDestSampleFormat()));
-	uint32_t channels = static_cast<uint32_t>(audioDecoder.getDestChannels());
-	uint32_t bufsize = static_cast<uint32_t>(audioSamplesNum) * bytesPerSample * channels;
-	uint8_t* buffer = new uint8_t[bufsize];
+	uint8_t* buffer = nullptr;
 	int temp = 0;
 	auto deleter = [&](int*){
-		delete [] buffer;
+		if(buffer) delete [] buffer;
 		audioPlayingThreadIsRunning = false;
 	};
 	std::unique_ptr<int, decltype(deleter)> threadFinishIndicator(&temp, deleter);
+
+	while(true) {
+		if(audioDecoder.availableData()) {
+			break;
+		}else if(audioPlayingThreadIsStopping || !audioDecoder.isRunning()) {
+			return;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+	}
+	uint32_t bytesPerSample = static_cast<uint32_t>(av_get_bytes_per_sample(audioDecoder.getDestSampleFormat()));
+	uint32_t channels = static_cast<uint32_t>(audioDecoder.getDestChannels());
+	uint32_t bufsize = static_cast<uint32_t>(audioSamplesNum) * bytesPerSample * channels;
+	buffer = new uint8_t[bufsize];
+
 	double sampleRate = static_cast<double>(audioDecoder.getDestSampleRate());
-	int64_t callPeriod = static_cast<int64_t>(1000000.0 / (sampleRate / audioSamplesNum)) - 3000;
+	int64_t callPeriod = static_cast<int64_t>(1000000.0 / (sampleRate / audioSamplesNum)) - 600;
 
 	int64_t lastCallTime = av_gettime();
+	int64_t cutPeriod = 0;
 	while(!audioPlayingThreadIsStopping && audioDecoder.isRunning()) {
 		int64_t now = av_gettime();
 		while(now - lastCallTime < callPeriod) {
@@ -313,24 +326,25 @@ void AVfileContext::audioPlaying() {
 
 		if(result > 0) {
 			std::unique_lock<std::mutex> locker(safeAudioCallbackMutex);
-			int oneStepWrited = 0;
-			int alreadyWrited = 0;
+			int32_t oneStepWrited = 0;
+			int32_t alreadyWrited = 0;
 			audioCallback(buffer, result, oneStepWrited);
-			while(oneStepWrited < static_cast<int>(result)) {
+			while(oneStepWrited < static_cast<int32_t>(result)) {
 				locker.unlock();
 				if(oneStepWrited > -1) {
-					result -= static_cast<unsigned>(oneStepWrited);
+					result -= static_cast<uint32_t>(oneStepWrited);
 					alreadyWrited += oneStepWrited;
 				}
 
 				oneStepWrited = 0;
 				now = av_gettime();
 				lastCallTime = now;
-				int64_t newCallPeriod = static_cast<int64_t>(1000000.0 / (sampleRate / (result / (bytesPerSample * channels))));
-				if(newCallPeriod >= 2000) {
-					newCallPeriod -= 1500;
+				int64_t newCallPeriod = static_cast<int64_t>(1000000.0 / (sampleRate / (static_cast<double>(result) / (bytesPerSample * channels)))) - 600;
+				cutPeriod = newCallPeriod - 3000;
+				if(cutPeriod >= 2000) {
+					std::this_thread::sleep_for(std::chrono::microseconds(cutPeriod));
 				}
-				std::this_thread::sleep_for(std::chrono::microseconds(newCallPeriod));
+
 				while(now - lastCallTime < newCallPeriod) {
 					now = av_gettime();
 				}
@@ -340,9 +354,13 @@ void AVfileContext::audioPlaying() {
 				}
 				audioCallback(&buffer[alreadyWrited], result, oneStepWrited);
 			}
+			//now = av_gettime();
 		}
 		lastCallTime = now;
-		std::this_thread::sleep_for(std::chrono::microseconds(callPeriod));
+		cutPeriod = callPeriod - 3000;
+		if(cutPeriod >= 2000) {
+			std::this_thread::sleep_for(std::chrono::microseconds(cutPeriod));
+		}
 	}
 }
 
@@ -418,13 +436,13 @@ bool AVfileContext::fallHandle() {
 			while(!readingThreadIsStopping) {
 				std::unique_lock<std::mutex> lock(safeReplayMutex, std::try_to_lock);
 				if(lock.owns_lock()) {
-					audioDecoder.stop();
 					if(audioPlayingThreadIsRunning) {
 						audioPlayingThreadIsStopping = true;
 						if(audioPlayingThread.joinable()) {
 							audioPlayingThread.join();
 						}
 					}
+					audioDecoder.stop();
 					break;
 				}
 			}

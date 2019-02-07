@@ -4,7 +4,12 @@
 template<class ItemType, class DeleterType, class UnreferencerType, class DoSomethingType>
 class AVItemContainer {
 	public:
-		AVItemContainer() = default;
+		AVItemContainer() {
+			item = nullptr;
+			deleteItem = nullptr;
+			unreferenceItem = nullptr;
+			doSomethingWithItem = nullptr;
+		}
 		AVItemContainer(const AVItemContainer&) = delete;
 		AVItemContainer& operator = (const AVItemContainer&) = delete;
 		AVItemContainer(AVItemContainer&& other) {
