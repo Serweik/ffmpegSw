@@ -25,9 +25,9 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 CONFIG += c++11
 
-DEPENDPATH += D:/SourcesLibrerys/ffmpeg-4.1-win64-dev/include
-INCLUDEPATH += D:/SourcesLibrerys/ffmpeg-4.1-win64-dev/include
-win32:LIBS += -LD:/SourcesLibrerys/ffmpeg-4.1-win64-dev/lib \
+DEPENDPATH += D:/sourcesLibs/ffmpeg/Windows/include
+INCLUDEPATH += D:/sourcesLibs/ffmpeg/Windows/include
+win32:LIBS += -LD:/sourcesLibs/ffmpeg/Windows/lib \
          -llibavutil -llibavcodec -llibavdevice -llibavfilter\
          -llibavformat -llibpostproc -llibswresample -llibswscale
 
@@ -59,6 +59,6 @@ MOBILITY =
 
 
 # Default rules for deployment.
-qnx: target.path = /tmp/$${TARGET}/bin
-else: unix:!android: target.path = /opt/$${TARGET}/bin
-!isEmpty(target.path): INSTALLS += target
+#qnx: target.path = /tmp/$${TARGET}/bin
+#else: unix:!android: target.path = /opt/$${TARGET}/bin
+#!isEmpty(target.path): INSTALLS += target

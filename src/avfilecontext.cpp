@@ -176,7 +176,6 @@ void AVfileContext::setAudioCallback(std::function<void(uint8_t*, uint32_t, int&
 			this->audioCallback = audioCallback;
 			this->audioSamplesNum = audioSamplesNum;
 			if(audioDecoder.isReady()) {
-				std::cout << "start play" << std::endl;
 				audioPlayingThreadIsRunning = true;
 				audioPlayingThreadIsStopping = false;
 				audioPlayingThread = std::thread(&AVfileContext::audioPlaying, this);
@@ -313,7 +312,7 @@ void AVfileContext::audioPlaying() {
 	buffer = new uint8_t[bufsize];
 
 	double sampleRate = static_cast<double>(audioDecoder.getDestSampleRate());
-	int64_t callPeriod = static_cast<int64_t>(1000000.0 / (sampleRate / audioSamplesNum)) - 600;
+	int64_t callPeriod = static_cast<int64_t>(1000000.0 / (sampleRate / audioSamplesNum));
 
 	int64_t lastCallTime = av_gettime();
 	int64_t cutPeriod = 0;
@@ -339,7 +338,7 @@ void AVfileContext::audioPlaying() {
 				oneStepWrited = 0;
 				now = av_gettime();
 				lastCallTime = now;
-				int64_t newCallPeriod = static_cast<int64_t>(1000000.0 / (sampleRate / (static_cast<double>(result) / (bytesPerSample * channels)))) - 600;
+				int64_t newCallPeriod = static_cast<int64_t>(1000000.0 / (sampleRate / (static_cast<double>(result) / (bytesPerSample * channels))));
 				cutPeriod = newCallPeriod - 3000;
 				if(cutPeriod >= 2000) {
 					std::this_thread::sleep_for(std::chrono::microseconds(cutPeriod));

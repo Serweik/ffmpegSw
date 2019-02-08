@@ -24,7 +24,7 @@ class Camera: public QWidget {
 		bool start();
 
 	private slots:
-		void feedAudioOutput();
+		void audioNotify();
 
 	private:
 		int fileDescriptor = -1;
@@ -47,6 +47,7 @@ class Camera: public QWidget {
 		bool audioPlayingThreadIsRunning = false;
 		bool audioPlayingThreadIsStopping = false;
 		void audioPlaying();
+		void feedAudioOutput();
 
 	// QObject interface
 	protected:

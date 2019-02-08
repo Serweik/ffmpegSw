@@ -4,8 +4,6 @@
 #include "videodecoder.h"
 #include "audiodecoder.h"
 
-#include <iostream>
-
 class AVfileContext {
 	public:
 		enum PlayingMode {
