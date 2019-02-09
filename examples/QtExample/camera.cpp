@@ -18,7 +18,6 @@ Camera::~Camera() {
 		}
 		if(audioOutput) delete audioOutput;
 	}
-	if(videoBuffer) delete [] videoBuffer;
 }
 
 void Camera::setPath(QString path) {
@@ -34,9 +33,10 @@ bool Camera::start() {
 		return false;
 	}
 	imageWidth = 800;
-	aVffmpegWrapper->setVideoConvertingParameters(fileDescriptor, AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR, imageWidth, 480);
-	videoBufsize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, 480, 1);
-	videoBuffer = new uint8_t[videoBufsize];
+	int imageHeight = 480;
+	aVffmpegWrapper->setVideoConvertingParameters(fileDescriptor, AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR, imageWidth, imageHeight);
+	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, 480, 1));
+	videoPixmap = QPixmap(imageWidth, imageHeight);
 	aVffmpegWrapper->setAudioConvertingParameters(fileDescriptor, AV_SAMPLE_FMT_S16, AV_CH_LAYOUT_STEREO);
 
 	renderingTimer = startTimer(2);
@@ -117,7 +117,9 @@ void Camera::timerEvent(QTimerEvent* event) {
 					audioOutput->setNotifyInterval(20);
 				}
 			}
-			if(aVffmpegWrapper->getVideoData(fileDescriptor, &videoBuffer[0], videoBufsize)) {
+			if(aVffmpegWrapper->getVideoData(fileDescriptor, reinterpret_cast<uint8_t*>(videoFrame.data()), videoFrame.size())) {
+				QImage image(reinterpret_cast<uint8_t*>(videoFrame.data()), imageWidth, this->height(), QImage::Format_RGB888);
+				videoPixmap = QPixmap::fromImage(image);
 				this->update();
 			}
 			renderingTimer = startTimer(2);
@@ -132,17 +134,15 @@ void Camera::resizeEvent(QResizeEvent* event){
 	if(aVffmpegWrapper->setVideoConvertingParameters(fileDescriptor, AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR, imageWidth, event->size().height())) {
 		imageWidth = aVffmpegWrapper->getDestinationWidth(fileDescriptor);
 	}
-	videoBufsize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, event->size().height(), 1);
-	delete [] videoBuffer;
-	videoBuffer = new uint8_t[videoBufsize];
+	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, event->size().height(), 1));
+	videoPixmap = videoPixmap.scaled(event->size());
 	QWidget::resizeEvent(event);
 }
 
 void Camera::paintEvent(QPaintEvent* event) {
-	if(videoBuffer) {
-		QImage image(&videoBuffer[0], imageWidth, this->height(), QImage::Format_RGB888);
+	if(videoFrame.size() > 0) {
 		QPainter painter(this);
-		painter.drawImage(this->rect(), image, image.rect());
+		painter.drawPixmap(this->rect(), videoPixmap, videoPixmap.rect());
 	}
 	event->accept();
 }

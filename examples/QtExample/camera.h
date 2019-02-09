@@ -9,6 +9,7 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QImage>
+#include <QPixmap>
 #include <QSize>
 #include <QSharedPointer>
 #include <QAudioOutput>
@@ -31,9 +32,10 @@ class Camera: public QWidget {
 		QSharedPointer<AVffmpegWrapper> aVffmpegWrapper;
 		QString path;
 		int renderingTimer = -1;
-		uint8_t* videoBuffer = nullptr;
-		int videoBufsize = 0;
 		int imageWidth = 0;
+
+		QByteArray videoFrame;
+		QPixmap videoPixmap;
 
 		QByteArray audioSamplesBuffer;
 		int numSamples = 0;
