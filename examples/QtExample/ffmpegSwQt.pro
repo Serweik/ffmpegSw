@@ -25,11 +25,43 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 CONFIG += c++11
 
-DEPENDPATH += D:/sourcesLibs/ffmpeg/Windows/include
-INCLUDEPATH += D:/sourcesLibs/ffmpeg/Windows/include
-win32:LIBS += -LD:/sourcesLibs/ffmpeg/Windows/lib \
-         -llibavutil -llibavcodec -llibavdevice -llibavfilter\
-         -llibavformat -llibpostproc -llibswresample -llibswscale
+#DEPENDPATH += D:/sourcesLibs/ffmpeg/Windows/include
+#INCLUDEPATH += D:/sourcesLibs/ffmpeg/Windows/include
+#win32:LIBS += -LD:/sourcesLibs/ffmpeg/Windows/lib \
+#         -llibavutil -llibavcodec -llibavdevice -llibavfilter\
+#         -llibavformat -llibpostproc -llibswresample -llibswscale
+
+win32 {
+    DEPENDPATH += D:/sourcesLibs/ffmpeg/Windows/include
+    INCLUDEPATH += D:/sourcesLibs/ffmpeg/Windows/include
+    LIBS += -LD:/sourcesLibs/ffmpeg/Windows/lib \
+             -llibavutil -llibavcodec -llibavdevice -llibavfilter\
+             -llibavformat -llibpostproc -llibswresample -llibswscale
+}
+
+android {
+    CONFIG += mobility
+    MOBILITY =
+
+    DEFINES += __STDC_CONSTANT_MACROS
+
+    INCLUDEPATH += $$PWD/ffmpeg/Android/include
+    DEPENDPATH += $$PWD/ffmpeg/Android/include
+
+    ANDROID_EXTRA_LIBS = \
+        D:/sourcesLibs/ffmpeg/Android/lib/armeabi-v7a/libavcodec.so \
+        D:/sourcesLibs/ffmpeg/Android/lib/armeabi-v7a/libavdevice.so \
+        D:/sourcesLibs/ffmpeg/Android/lib/armeabi-v7a/libavfilter.so \
+        D:/sourcesLibs/ffmpeg/Android/lib/armeabi-v7a/libavformat.so \
+        D:/sourcesLibs/ffmpeg/Android/lib/armeabi-v7a/libavutil.so \
+        D:/sourcesLibs/ffmpeg/Android/lib/armeabi-v7a/libswresample.so \
+        D:/sourcesLibs/ffmpeg/Android/lib/armeabi-v7a/libswscale.so
+
+    LIBS += -LD:/sourcesLibs/ffmpeg/Android/lib/armeabi-v7a \
+         -lavutil -lavcodec -lavdevice -lavfilter\
+         -lavformat -lswresample -lswscale
+}
+
 
 SOURCES += \
         main.cpp \
@@ -57,8 +89,17 @@ FORMS += \
 CONFIG += mobility
 MOBILITY = 
 
+DISTFILES += \
+    android/AndroidManifest.xml \
+    android/gradle/wrapper/gradle-wrapper.jar \
+    android/gradlew \
+    android/res/values/libs.xml \
+    android/build.gradle \
+    android/gradle/wrapper/gradle-wrapper.properties \
+    android/gradlew.bat
 
-# Default rules for deployment.
-#qnx: target.path = /tmp/$${TARGET}/bin
-#else: unix:!android: target.path = /opt/$${TARGET}/bin
-#!isEmpty(target.path): INSTALLS += target
+contains(ANDROID_TARGET_ARCH,armeabi-v7a) {
+    ANDROID_PACKAGE_SOURCE_DIR = \
+        $$PWD/android
+
+}
