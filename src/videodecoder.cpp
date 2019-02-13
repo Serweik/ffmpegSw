@@ -43,7 +43,10 @@ bool VideoDecoder::getData(uint8_t** data, int* linesize) {
 	int64_t now = av_gettime();
 	if(now - lastTime >= frameShowDelay) {
 		lastTime = now;
-		std::unique_lock<std::mutex> frameLocker(frameMutex);
+		std::unique_lock<std::mutex> frameLocker(frameMutex, std::try_to_lock);
+		if(!frameLocker.owns_lock()) {
+			while(!frameLocker.try_lock());
+		}
 		if(stopping) return false;
 		AVFrame* decodedFrame = frame[static_cast<unsigned>(frameReadIndex)].getPtr();
 		av_image_copy(&data[0], &linesize[0],
@@ -131,10 +134,13 @@ bool VideoDecoder::getData(uint8_t* data, int dataSize) {
 	int64_t now = av_gettime();
 	if(now - lastTime >= frameShowDelay) {
 		lastTime = now;
-		std::unique_lock<std::mutex> frameLocker(frameMutex);
+		std::unique_lock<std::mutex> frameLocker(frameMutex, std::try_to_lock);
+		if(!frameLocker.owns_lock()) {
+			while(!frameLocker.try_lock());
+		}
 		if(stopping) return false;
 		AVFrame* decodedFrame = frame[static_cast<unsigned>(frameReadIndex)].getPtr();
-		av_image_copy_to_buffer(&data[0], dataSize, const_cast<const uint8_t**>(&decodedFrame->data[0]), &decodedFrame->linesize[0], destPixFormat, destWidth, destHeight, 1);
+		av_image_copy_to_buffer(&data[0], dataSize, const_cast<const uint8_t**>(&decodedFrame->data[0]), &decodedFrame->linesize[0], destPixFormat, destWidth, destHeight, 32);
 		++ frameReadIndex;
 		if(static_cast<unsigned>(frameReadIndex) >= frame.size()) {
 			frameReadIndex = 0;
@@ -211,7 +217,7 @@ bool VideoDecoder::setConvertingParameters(AVPixelFormat dstFormat, int flags, i
 	if(codecContext) {
 		dstW = dstW == -1 ? codecContext->width : dstW;
 		dstH = dstH == -1 ? codecContext->height : dstH;
-		while(dstW % 4 != 0) {dstW += 1;} //for alignment, else the image will have distortions
+		while(dstW % 32 != 0) {dstW += 1;} //for alignment, else the image will have distortions
 		if(dstW <= 0 || dstH <= 0 || codecContext->pix_fmt == AVPixelFormat::AV_PIX_FMT_NONE) {
 			destPixFormat = dstFormat;
 			destWidth = dstW;
@@ -239,6 +245,7 @@ bool VideoDecoder::setConvertingParameters(AVPixelFormat dstFormat, int flags, i
 	convertContext = newContext;
 	if(convertContext == nullptr) {
 		destPixFormat = dstFormat;
+		while(dstW % 32 != 0) {dstW += 1;} //for alignment, else the image will have distortions
 		destWidth = dstW;
 		destHeight = dstH;
 		convertFlags = flags;
@@ -311,7 +318,7 @@ bool VideoDecoder::convertFrame(AVFrame* dest, AVFrame* source) {
 			if(destWidth <= 0) {
 				destWidth = codecContext->width;
 			}
-			while(destWidth % 4 != 0) {destWidth += 1;} //for alignment, else the image will have distortions
+			while(destWidth % 32 != 0) {destWidth += 1;} //for alignment, else the image will have distortions
 			convertContext = sws_getContext(
 										codecContext->width, codecContext->height,
 										codecContext->pix_fmt,
@@ -324,7 +331,7 @@ bool VideoDecoder::convertFrame(AVFrame* dest, AVFrame* source) {
 			srcHeight = codecContext->height;
 			srcWidth = codecContext->width;
 			srcPixFormat = codecContext->pix_fmt;
-			reconvertAll(AVPixelFormat::AV_PIX_FMT_NONE, destWidth, destHeight); //only for first initialization if we couldn't recieve codec's parameters at start!
+			reconvertAll(AVPixelFormat::AV_PIX_FMT_NONE, srcWidth, srcHeight); //only for first initialization if we couldn't recieve codec's parameters at start!
 		}else {
 			return false;
 		}
@@ -347,7 +354,7 @@ void VideoDecoder::reconvertAll(AVPixelFormat oldPixFormat, int oldWidth, int ol
 	if(frameReadIndex == frameWriteIndex) {
 		for(unsigned int i = 0; i < frame.size(); ++ i) {
 			frame[i].unrefPtr();
-			av_image_alloc(frame[i].getPtr()->data, frame[i].getPtr()->linesize, destWidth, destHeight, destPixFormat, 1);
+			av_image_alloc(frame[i].getPtr()->data, frame[i].getPtr()->linesize, destWidth, destHeight, destPixFormat, 32);
 			frame[i].markPtrHowReferenced();
 		}
 	}else {
@@ -363,7 +370,7 @@ void VideoDecoder::reconvertAll(AVPixelFormat oldPixFormat, int oldWidth, int ol
 				good = true;
 				for(int isign = frameReadIndex; std::abs(isign - frameWriteIndex) > 0; ++ isign) { //rescale already decoded frames
 					AVFrame* dest = av_frame_alloc();
-					av_image_alloc(dest->data, dest->linesize, destWidth, destHeight, destPixFormat, 1);
+					av_image_alloc(dest->data, dest->linesize, destWidth, destHeight, destPixFormat, 32);
 					int temp = 0;
 					auto deleter = [&](int*) {
 						if(dest) {
@@ -405,7 +412,7 @@ void VideoDecoder::reconvertAll(AVPixelFormat oldPixFormat, int oldWidth, int ol
 		for(int isign = frameWriteIndex; std::abs(isign - frameReadIndex) > 0; ++ isign) { //reallock other frames
 			unsigned int i = static_cast<unsigned>(isign);
 			frame[i].unrefPtr();
-			av_image_alloc(frame[i].getPtr()->data, frame[i].getPtr()->linesize, destWidth, destHeight, destPixFormat, 1);
+			av_image_alloc(frame[i].getPtr()->data, frame[i].getPtr()->linesize, destWidth, destHeight, destPixFormat, 32);
 			frame[i].markPtrHowReferenced();
 			if(static_cast<unsigned>(isign) >= frame.size() - 1) {
 				isign = -1;

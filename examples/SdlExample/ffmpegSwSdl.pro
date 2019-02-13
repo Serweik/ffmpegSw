@@ -4,16 +4,17 @@ CONFIG += console
 CONFIG -= c
 CONFIG -= qt
 
-DEPENDPATH += D:/SourcesLibrerys/ffmpeg-4.1-win64-dev/include
-INCLUDEPATH += D:/SourcesLibrerys/ffmpeg-4.1-win64-dev/include
-win32:LIBS += -LD:/SourcesLibrerys/ffmpeg-4.1-win64-dev/lib \
-         -llibavutil -llibavcodec -llibavdevice -llibavfilter\
-         -llibavformat -llibpostproc -llibswresample -llibswscale
+win32 {
+    DEPENDPATH += D:/sourcesLibs/ffmpeg/Windows/include
+    INCLUDEPATH += D:/sourcesLibs/ffmpeg/Windows/include
+    LIBS += -LD:/sourcesLibs/ffmpeg/Windows/lib \
+             -llibavutil -llibavcodec -llibavdevice -llibavfilter\
+             -llibavformat -llibpostproc -llibswresample -llibswscale
 
-
-DEPENDPATH += D:/SourcesLibrerys/SDL2-2.0.9/x86_64-w64-mingw32/include/SDL2
-INCLUDEPATH += D:/SourcesLibrerys/SDL2-2.0.9/x86_64-w64-mingw32/include/SDL2
-win32:LIBS += -LD:/SourcesLibrerys/SDL2-2.0.9/x86_64-w64-mingw32/lib -llibSDL2 -llibSDL2main
+    DEPENDPATH += D:/sourcesLibs/SDL2-2.0.9/x86_64-w64-mingw32/include/SDL2
+    INCLUDEPATH += D:/sourcesLibs/SDL2-2.0.9/x86_64-w64-mingw32/include/SDL2
+    LIBS += -LD:/sourcesLibs/SDL2-2.0.9/x86_64-w64-mingw32/lib -llibSDL2 -llibSDL2main
+}
 
 SOURCES += \
         main.cpp \

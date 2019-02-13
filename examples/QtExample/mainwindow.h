@@ -23,7 +23,6 @@ class MainWindow: public QMainWindow {
 	private:
 		Ui::MainWindow* ui;
 		QGridLayout* cameraLayout = nullptr;
-		QSharedPointer<AVffmpegWrapper> aVffmpegWrapper;
 };
 
 #endif // MAINWINDOW_H

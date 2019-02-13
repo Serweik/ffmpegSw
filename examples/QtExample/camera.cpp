@@ -1,23 +1,25 @@
 #include "camera.h"
 
-Camera::Camera(QSharedPointer<AVffmpegWrapper> _aVffmpegWrapper, QWidget* parent):
-	QWidget(parent), aVffmpegWrapper(_aVffmpegWrapper)
+Camera::Camera(QWidget* parent):
+	QWidget(parent)
 {
 
 }
 
 Camera::~Camera() {
-	if(fileDescriptor != -1) {
-		killTimer(renderingTimer);
-		aVffmpegWrapper->closeFile(fileDescriptor);
-		if(audioPlayingThreadIsRunning) {
-			audioPlayingThreadIsStopping = true;
-			if(audioPlayingThread.joinable()) {
-				audioPlayingThread.join();
-			}
+	killTimer(renderingTimer);
+	avFile.closeFile();
+	if(audioPlayingThreadIsRunning) {
+		audioPlayingThreadIsStopping = true;
+		if(audioPlayingThread.joinable()) {
+			audioPlayingThread.join();
 		}
-		if(audioOutput) delete audioOutput;
 	}
+	if(audioThread) {
+		audioThread->exit(0);
+		audioThread->wait(1000);
+	}
+	if(audioOutput) delete audioOutput;
 }
 
 void Camera::setPath(QString path) {
@@ -25,21 +27,20 @@ void Camera::setPath(QString path) {
 }
 
 bool Camera::start() {
-	fileDescriptor = aVffmpegWrapper->openFile(path.toStdString(),
-											   AVfileContext::REPEATE_AND_RECONNECT,
-											   AVfileContext::VIDEO | AVfileContext::AUDIO);
-
-	if(fileDescriptor == -1) {
+	imageWidth = 800;
+	imageHeight = 480;
+	avFile.setVideoConvertingParameters(AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR, imageWidth, imageHeight);
+	imageWidth = avFile.getDestinationWidth();
+	imageHeight = avFile.getDestinationHeigth();
+	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, imageHeight, 32));
+	videoPixmap = QPixmap(imageWidth, imageHeight);
+	avFile.setAudioConvertingParameters(AV_SAMPLE_FMT_S16, AV_CH_LAYOUT_STEREO);
+	if(!avFile.openFile(path.toStdString(),
+					   AVfileContext::REPEATE_AND_RECONNECT,
+					   AVfileContext::VIDEO | AVfileContext::AUDIO)) {
 		return false;
 	}
-	imageWidth = 800;
-	int imageHeight = 480;
-	aVffmpegWrapper->setVideoConvertingParameters(fileDescriptor, AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR, imageWidth, imageHeight);
-	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, 480, 1));
-	videoPixmap = QPixmap(imageWidth, imageHeight);
-	aVffmpegWrapper->setAudioConvertingParameters(fileDescriptor, AV_SAMPLE_FMT_S16, AV_CH_LAYOUT_STEREO);
-
-	renderingTimer = startTimer(2);
+	renderingTimer = startTimer(2, Qt::PreciseTimer);
 	return true;
 }
 
@@ -67,18 +68,21 @@ void Camera::audioPlaying() {
 	buffer = new uint8_t[audioBufsize];
 
 	int64_t interval = static_cast<int64_t>(1000000.0 / (sampleRate / numSamples));
+	int64_t lastTime = av_gettime();
 	while(!audioPlayingThreadIsStopping) {
-		int result = static_cast<int>(aVffmpegWrapper->getAudioData(fileDescriptor, &buffer[0], static_cast<uint32_t>(audioBufsize)));
+		while(av_gettime() - lastTime < interval);
+		lastTime = av_gettime();
+		int result = static_cast<int>(avFile.getAudioData(&buffer[0], static_cast<uint32_t>(audioBufsize)));
 		if(result > 0) {
 			std::unique_lock<std::mutex> locker(audioSamplesMutex);
-			if(audioSamplesBuffer.size() < audioBufsize * 10) {
-				audioSamplesBuffer.append(reinterpret_cast<const char*>(&buffer[0]), result);
-			}
+			audioSamplesBuffer.append(reinterpret_cast<const char*>(&buffer[0]), result);
 			feedAudioOutput();
+			while(audioSamplesBuffer.size() > audioOutput->bufferSize()) {
+				feedAudioOutput();
+			}
 			locker.unlock();
-			int64_t lastTime = av_gettime();
-			int64_t newInterval = interval - (av_gettime() - lastTime);
-			if(newInterval >= 100) {
+			int64_t newInterval = (interval - (av_gettime() - lastTime)) - 3000;
+			if(newInterval >= 3000) {
 				std::this_thread::sleep_for(std::chrono::microseconds(newInterval));
 			}
 		}else {
@@ -89,23 +93,28 @@ void Camera::audioPlaying() {
 
 void Camera::timerEvent(QTimerEvent* event) {
 	if(event->timerId() == renderingTimer) {
-		killTimer(renderingTimer);
-		if(!aVffmpegWrapper->endOfFile(fileDescriptor)) {
-			if(!audioPlayingThreadIsRunning && aVffmpegWrapper->hasAudioStream(fileDescriptor)) {
-				numSamples = 1536;
+		if(!avFile.endOfFile()) {
+			if(!audioPlayingThreadIsRunning && avFile.hasAudioStream()) {
+				numSamples = avFile.getNbSamples();
+				if(numSamples < 100) {
+					numSamples = 1536;
+				}
 				audioBufsize = numSamples * 2 * 2; /*because 2 channels and 2 bytes per sample*/
 				format.setChannelCount(2);
 				format.setSampleSize(16);
 				format.setCodec("audio/pcm");
 				format.setByteOrder(QAudioFormat::LittleEndian);
 				format.setSampleType(QAudioFormat::SignedInt);
-				sampleRate = aVffmpegWrapper->audioSampleRate(fileDescriptor);
+				sampleRate = avFile.audioSampleRate();
 				format.setSampleRate(static_cast<int>(sampleRate));
 				audioOutput = new QAudioOutput(format);
+				audioThread = new QThread(this);
+				audioOutput->moveToThread(audioThread);
 				audioOutput->setBufferSize(audioBufsize * 20);
 				audioDevice = audioOutput->start();
-				audioDevice->open(QIODevice::WriteOnly);
 				if(audioOutput->error() != QAudio::NoError) {
+					delete audioThread;
+					audioThread = nullptr;
 					delete audioOutput;
 					audioOutput = nullptr;
 					audioDevice = nullptr;
@@ -113,34 +122,41 @@ void Camera::timerEvent(QTimerEvent* event) {
 					audioPlayingThreadIsRunning = true;
 					audioPlayingThreadIsStopping = false;
 					audioPlayingThread = std::thread(&Camera::audioPlaying, this);
-					connect(audioOutput, SIGNAL(notify()), this, SLOT(audioNotify()));
-					audioOutput->setNotifyInterval(20);
+					connect(audioOutput, SIGNAL(notify()), this, SLOT(audioNotify()), Qt::DirectConnection);
+					audioOutput->setNotifyInterval(static_cast<int>((1000.0 / (sampleRate / numSamples)) / 2));
+					audioThread->start();
 				}
 			}
-			if(aVffmpegWrapper->getVideoData(fileDescriptor, reinterpret_cast<uint8_t*>(videoFrame.data()), videoFrame.size())) {
-				QImage image(reinterpret_cast<uint8_t*>(videoFrame.data()), imageWidth, this->height(), QImage::Format_RGB888);
-				videoPixmap = QPixmap::fromImage(image);
-				this->update();
+			if(avFile.getVideoData(reinterpret_cast<uint8_t*>(videoFrame.data()), videoFrame.size())) {
+				QImage image(reinterpret_cast<uint8_t*>(videoFrame.data()), imageWidth, imageHeight, QImage::Format_RGB888);
+				if(!image.isNull()) {
+					videoPixmap = QPixmap::fromImage(image);
+					videoFrameUpdated = true;
+					this->update();
+				}
 			}
-			renderingTimer = startTimer(2);
 		}else {
+			killTimer(renderingTimer);
 			this->deleteLater();
 		}
 	}
 }
 
 void Camera::resizeEvent(QResizeEvent* event){
+	videoFrameUpdated = false;
 	imageWidth = event->size().width();
-	if(aVffmpegWrapper->setVideoConvertingParameters(fileDescriptor, AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR, imageWidth, event->size().height())) {
-		imageWidth = aVffmpegWrapper->getDestinationWidth(fileDescriptor);
+	imageHeight = event->size().height();
+	if(avFile.setVideoConvertingParameters(AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR, imageWidth, imageHeight)) {
+		imageWidth = avFile.getDestinationWidth();
+		imageHeight = avFile.getDestinationHeigth();
 	}
-	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, event->size().height(), 1));
-	videoPixmap = videoPixmap.scaled(event->size());
+	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, imageHeight, 32));
 	QWidget::resizeEvent(event);
 }
 
 void Camera::paintEvent(QPaintEvent* event) {
-	if(videoFrame.size() > 0) {
+	if(videoFrameUpdated) {
+		videoFrameUpdated = false;
 		QPainter painter(this);
 		painter.drawPixmap(this->rect(), videoPixmap, videoPixmap.rect());
 	}

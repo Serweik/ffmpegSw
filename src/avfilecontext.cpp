@@ -137,16 +137,14 @@ int AVfileContext::getDestinationWidth() {
 }
 
 int AVfileContext::getDestinationHeigth() {
-	return videoDecoder.getSourceHeigth();
+	return videoDecoder.getDestinationHeigth();
 }
 
 bool AVfileContext::setVideoConvertingParameters(AVPixelFormat dstFormat, int flags, int dstW, int dstH) {
-	std::lock_guard<std::mutex> lock(safeReplayMutex);
 	return videoDecoder.setConvertingParameters(dstFormat, flags, dstW, dstH);
 }
 
 bool AVfileContext::setAudioConvertingParameters(AVSampleFormat destSampleFormat, int64_t destChLayuot, int destSampleRate) {
-	std::lock_guard<std::mutex> lock(safeReplayMutex);
 	bool result = audioDecoder.setConvertingParameters(destSampleFormat, destChLayuot, destSampleRate);
 	if(result) {
 		if(audioPlayingThreadIsRunning) {
@@ -279,6 +277,10 @@ int AVfileContext::audioSampleRate() {
 
 int AVfileContext::audioChannels() {
 	return audioDecoder.getDestChannels();
+}
+
+int AVfileContext::getNbSamples() {
+	return audioDecoder.getNbSamples();
 }
 
 bool AVfileContext::hasVideoStream() {

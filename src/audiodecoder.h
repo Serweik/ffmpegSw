@@ -26,6 +26,7 @@ class AudioDecoder: public AVBaseDecoder {
 		AVSampleFormat getDestSampleFormat();
 		int getDestChannels();
 		int getDestSampleRate();
+		int getNbSamples();
 
 	protected:
 		SwrContext* convertContext = nullptr;
@@ -35,6 +36,8 @@ class AudioDecoder: public AVBaseDecoder {
 		int destSample_rate = 0;
 		int64_t destCh_layuot = 0;
 		AVSampleFormat destSample_format;
+
+		int nbSmples = 0;
 
 		uint32_t dataSize = 0;
 

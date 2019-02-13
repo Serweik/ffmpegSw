@@ -45,6 +45,7 @@ class AVfileContext {
 		uint32_t getAudioData(uint8_t* data, uint32_t dataSize);
 		int audioSampleRate();
 		int audioChannels();
+		int getNbSamples();
 		bool hasVideoStream();
 		bool hasAudioStream();
 

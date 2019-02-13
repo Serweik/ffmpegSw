@@ -80,12 +80,12 @@ bool AVBaseDecoder::pushPacket(AVPacket* newPacket) {
 
 	std::unique_lock<std::mutex> packLocker(packetMutex);
 	if(stopping) return false;
-	if(((packetWriteIndex < packetReadIndex) && (packetReadIndex - packetWriteIndex < 10)) //free space in the buffer is less then 6 items
-	 ||((packetWriteIndex > packetReadIndex) && (packetWriteIndex - packetReadIndex > packetsBufferSize - 10))) { //free space in the buffer is less then 6 items
+	if(((packetWriteIndex < packetReadIndex) && (packetReadIndex - packetWriteIndex < 6)) //free space in the buffer is less then 6 items
+	 ||((packetWriteIndex > packetReadIndex) && (packetWriteIndex - packetReadIndex > packetsBufferSize - 6))) { //free space in the buffer is less then 6 items
 		packetCond.wait(packLocker, [&](){
 			return (packetWriteIndex == packetReadIndex)
-					|| (((packetWriteIndex < packetReadIndex) && (packetReadIndex - packetWriteIndex > 10)) //the buffer has free item
-					 || ((packetWriteIndex > packetReadIndex) && (packetWriteIndex - packetReadIndex < packetsBufferSize - 10)))//the buffer has free item
+					|| (((packetWriteIndex < packetReadIndex) && (packetReadIndex - packetWriteIndex > 6)) //the buffer has free item
+					 || ((packetWriteIndex > packetReadIndex) && (packetWriteIndex - packetReadIndex < packetsBufferSize - 6)))//the buffer has free item
 					|| stopping;});
 		if(stopping) {
 			return false;

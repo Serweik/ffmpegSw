@@ -4,7 +4,6 @@
 MainWindow::MainWindow(QWidget *parent):
 	QMainWindow(parent), ui(new Ui::MainWindow) {
 	ui->setupUi(this);
-	aVffmpegWrapper = QSharedPointer<AVffmpegWrapper>(new AVffmpegWrapper);
 	cameraLayout = new QGridLayout();
 	cameraLayout->setObjectName("cameraLayout");
 	ui->widget->setLayout(cameraLayout);
@@ -16,7 +15,7 @@ MainWindow::~MainWindow() {
 
 void MainWindow::on_addCamera_clicked() {
 	if(!ui->pathToSource->text().isEmpty()) {
-		Camera* camera = new Camera(aVffmpegWrapper);
+		Camera* camera = new Camera();
 		camera->setPath(ui->pathToSource->text());
 		if(camera->start()) {
 			int row = cameraLayout->rowCount();

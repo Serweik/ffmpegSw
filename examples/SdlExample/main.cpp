@@ -38,7 +38,7 @@ static void audio_callback(void* userdata, uint8_t* stream, int len) {
 int main() {
 	int width = 1920;
 	int height = 1080;
-	std::string path = "rtsp://184.72.239.149/vod/mp4:BigBuckBunny_115k.mov";
+	std::string path = "D:/bbb_sunflower_1080p_60fps_normal.mp4";
 	int fileDescriptor = aVffmpegWrapper.openFile(path, AVfileContext::REPEATE_AND_RECONNECT, AVfileContext::VIDEO | AVfileContext::AUDIO);
 	if(fileDescriptor == -1) {
 		std::cout << "can't open file " << std::endl;
@@ -49,6 +49,8 @@ int main() {
 		std::cout << "error setVideoConvertingParameters " << std::endl;
 		return -1;
 	}
+	width = aVffmpegWrapper.getDestinationWidth(fileDescriptor);
+
 	if(!aVffmpegWrapper.setAudioConvertingParameters(fileDescriptor, AV_SAMPLE_FMT_S16, AV_CH_LAYOUT_STEREO)) {
 		std::cout << "error setAudioConvertingParameters " << std::endl;
 		return -1;

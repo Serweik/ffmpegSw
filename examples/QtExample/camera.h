@@ -1,7 +1,7 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include "../../src/avffmpegwrapper.h"
+#include "../../src/avfilecontext.h"
 
 #include <QWidget>
 #include <QTimerEvent>
@@ -11,14 +11,16 @@
 #include <QImage>
 #include <QPixmap>
 #include <QSize>
-#include <QSharedPointer>
 #include <QAudioOutput>
 #include <QByteArray>
+#include <QThread>
+
+//#include <iostream>
 
 class Camera: public QWidget {
 	Q_OBJECT
 	public:
-		explicit Camera(QSharedPointer<AVffmpegWrapper> _aVffmpegWrapper, QWidget* parent = nullptr);
+		explicit Camera(QWidget* parent = nullptr);
 		~Camera() override;
 
 		void setPath(QString path);
@@ -28,14 +30,14 @@ class Camera: public QWidget {
 		void audioNotify();
 
 	private:
-		int fileDescriptor = -1;
-		QSharedPointer<AVffmpegWrapper> aVffmpegWrapper;
 		QString path;
 		int renderingTimer = -1;
 		int imageWidth = 0;
+		int imageHeight = 0;
 
 		QByteArray videoFrame;
 		QPixmap videoPixmap;
+		bool videoFrameUpdated = false;
 
 		QByteArray audioSamplesBuffer;
 		int numSamples = 0;
@@ -48,8 +50,13 @@ class Camera: public QWidget {
 		std::mutex audioSamplesMutex;
 		bool audioPlayingThreadIsRunning = false;
 		bool audioPlayingThreadIsStopping = false;
+		QThread* audioThread = nullptr;
+		AVfileContext avFile;
+
 		void audioPlaying();
 		void feedAudioOutput();
+
+		void videoPlaying();
 
 	// QObject interface
 	protected:

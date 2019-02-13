@@ -30,7 +30,10 @@ uint32_t AudioDecoder::getData(uint8_t* data, uint32_t requairedDataSize) {
 	if(dataSize == 0) return 0;
 
 	uint32_t givenSize = 0;
-	std::unique_lock<std::mutex> frameLocker(frameMutex);
+	std::unique_lock<std::mutex> frameLocker(frameMutex, std::try_to_lock);
+	if(!frameLocker.owns_lock()) {
+		while(!frameLocker.try_lock());
+	}
 	if(stopping) return 0;
 
 	AVFrame* decodedFrame = frame[static_cast<unsigned>(frameReadIndex)].getPtr();
@@ -181,6 +184,11 @@ int AudioDecoder::getDestSampleRate() {
 	return destSample_rate;
 }
 
+int AudioDecoder::getNbSamples() {
+	std::unique_lock<std::mutex> frameLocker(frameMutex);
+	return nbSmples;
+}
+
 uint32_t AudioDecoder::getDataFromFrame(AVFrame* decodedFrame, bool& isEmpty, uint8_t* data, uint32_t requairedDataSize) {
 	uint32_t linesize = static_cast<uint32_t>(av_get_bytes_per_sample(static_cast<AVSampleFormat>(decodedFrame->format)) * decodedFrame->nb_samples);
 	uint32_t fullSize = static_cast<uint32_t>(decodedFrame->channels) * linesize;
@@ -260,6 +268,7 @@ bool AudioDecoder::convertFrame(AVFrame* dest, AVFrame* source) {
 	dest->pkt_dts = source->pkt_dts;
 	dest->pts = source->pts;
 	if(swr_convert_frame(convertContext, dest, source) == 0) {
+		nbSmples = dest->nb_samples;
 		return true;
 	}else {
 		return false;
