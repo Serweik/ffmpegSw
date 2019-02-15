@@ -29,10 +29,10 @@ void Camera::setPath(QString path) {
 bool Camera::start() {
 	imageWidth = 800;
 	imageHeight = 480;
-	avFile.setVideoConvertingParameters(AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR, imageWidth, imageHeight);
+	avFile.setVideoConvertingParameters(AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, imageWidth, imageHeight);
 	imageWidth = avFile.getDestinationWidth();
 	imageHeight = avFile.getDestinationHeigth();
-	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, imageHeight, 32));
+	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_BGRA, imageWidth, imageHeight, 32));
 	videoPixmap = QPixmap(imageWidth, imageHeight);
 	avFile.setAudioConvertingParameters(AV_SAMPLE_FMT_S16, AV_CH_LAYOUT_STEREO);
 	if(!avFile.openFile(path.toStdString(),
@@ -67,7 +67,7 @@ void Camera::audioPlaying() {
 
 	buffer = new uint8_t[audioBufsize];
 
-	int64_t interval = static_cast<int64_t>(1000000.0 / (sampleRate / numSamples));
+	int64_t interval = static_cast<int64_t>(1000000.0 / (sampleRate / numSamples)) - 700;
 	int64_t lastTime = av_gettime();
 	while(!audioPlayingThreadIsStopping) {
 		while(av_gettime() - lastTime < interval);
@@ -127,12 +127,13 @@ void Camera::timerEvent(QTimerEvent* event) {
 					audioThread->start();
 				}
 			}
+			//bool result = avFile.getVideoData(reinterpret_cast<uint8_t*>(videoFrame.data()), videoFrame.size());
 			if(avFile.getVideoData(reinterpret_cast<uint8_t*>(videoFrame.data()), videoFrame.size())) {
-				QImage image(reinterpret_cast<uint8_t*>(videoFrame.data()), imageWidth, imageHeight, QImage::Format_RGB888);
+				QImage image(reinterpret_cast<uint8_t*>(videoFrame.data()), imageWidth, imageHeight, imageWidth * 4, QImage::Format_RGB32);
 				if(!image.isNull()) {
 					videoPixmap = QPixmap::fromImage(image);
 					videoFrameUpdated = true;
-					this->update();
+					this->repaint();
 				}
 			}
 		}else {
@@ -146,11 +147,11 @@ void Camera::resizeEvent(QResizeEvent* event){
 	videoFrameUpdated = false;
 	imageWidth = event->size().width();
 	imageHeight = event->size().height();
-	if(avFile.setVideoConvertingParameters(AV_PIX_FMT_RGB24, SWS_FAST_BILINEAR, imageWidth, imageHeight)) {
+	if(avFile.setVideoConvertingParameters(AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, imageWidth, imageHeight)) {
 		imageWidth = avFile.getDestinationWidth();
 		imageHeight = avFile.getDestinationHeigth();
 	}
-	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_RGB24, imageWidth, imageHeight, 32));
+	videoFrame.resize(av_image_get_buffer_size(AV_PIX_FMT_BGRA, imageWidth, imageHeight, 32));
 	QWidget::resizeEvent(event);
 }
 
