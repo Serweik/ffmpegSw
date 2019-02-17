@@ -19,7 +19,6 @@ Camera::~Camera() {
 		audioThread->exit(0);
 		audioThread->wait(1000);
 	}
-	if(audioOutput) delete audioOutput;
 }
 
 void Camera::setPath(QString path) {
@@ -67,7 +66,7 @@ void Camera::audioPlaying() {
 
 	buffer = new uint8_t[audioBufsize];
 
-	int64_t interval = static_cast<int64_t>(1000000.0 / (sampleRate / numSamples)) - 700;
+	int64_t interval = static_cast<int64_t>(1000000.0 / (sampleRate / numSamples)) - 100;
 	int64_t lastTime = av_gettime();
 	while(!audioPlayingThreadIsStopping) {
 		while(av_gettime() - lastTime < interval);
@@ -107,27 +106,24 @@ void Camera::timerEvent(QTimerEvent* event) {
 				format.setSampleType(QAudioFormat::SignedInt);
 				sampleRate = avFile.audioSampleRate();
 				format.setSampleRate(static_cast<int>(sampleRate));
-				audioOutput = new QAudioOutput(format);
 				audioThread = new QThread(this);
-				audioOutput->moveToThread(audioThread);
+				audioOutput = new QAudioOutput(format, audioThread);
 				audioOutput->setBufferSize(audioBufsize * 20);
 				audioDevice = audioOutput->start();
 				if(audioOutput->error() != QAudio::NoError) {
 					delete audioThread;
 					audioThread = nullptr;
-					delete audioOutput;
 					audioOutput = nullptr;
 					audioDevice = nullptr;
 				}else {
-					audioPlayingThreadIsRunning = true;
-					audioPlayingThreadIsStopping = false;
-					audioPlayingThread = std::thread(&Camera::audioPlaying, this);
 					connect(audioOutput, SIGNAL(notify()), this, SLOT(audioNotify()), Qt::DirectConnection);
 					audioOutput->setNotifyInterval(static_cast<int>((1000.0 / (sampleRate / numSamples)) / 2));
 					audioThread->start();
+					audioPlayingThreadIsRunning = true;
+					audioPlayingThreadIsStopping = false;
+					audioPlayingThread = std::thread(&Camera::audioPlaying, this);
 				}
 			}
-			//bool result = avFile.getVideoData(reinterpret_cast<uint8_t*>(videoFrame.data()), videoFrame.size());
 			if(avFile.getVideoData(reinterpret_cast<uint8_t*>(videoFrame.data()), videoFrame.size())) {
 				QImage image(reinterpret_cast<uint8_t*>(videoFrame.data()), imageWidth, imageHeight, imageWidth * 4, QImage::Format_RGB32);
 				if(!image.isNull()) {

@@ -38,7 +38,7 @@ static void audio_callback(void* userdata, uint8_t* stream, int len) {
 int main() {
 	int width = 1920;
 	int height = 1080;
-	std::string path = "D:/bbb_sunflower_1080p_60fps_normal.mp4";
+	std::string path = "D:/фильмы/Deadpool 2 (2018) [Super Duper Cut].1080p.BluRay.10-bit.x265.mkv";
 	int fileDescriptor = aVffmpegWrapper.openFile(path, AVfileContext::REPEATE_AND_RECONNECT, AVfileContext::VIDEO | AVfileContext::AUDIO);
 	if(fileDescriptor == -1) {
 		std::cout << "can't open file " << std::endl;

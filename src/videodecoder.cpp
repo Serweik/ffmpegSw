@@ -81,8 +81,8 @@ bool VideoDecoder::getData(uint8_t** data, int* linesize) {
 			}else if((diff < -100000) || (diff > 100000)) {
 				stabilized = false;
 			}else if(stabilized) {
-				diff = diff > 2000 ? 2000
-								   : diff < -2000 ? -2000
+				diff = diff > 5000 ? 5000
+								   : diff < -5000 ? -5000
 												  : diff;
 			}
 			diffPts = static_cast<int64_t>(diff);
@@ -169,8 +169,8 @@ bool VideoDecoder::getData(uint8_t* data, int dataSize) {
 			}else if((diff < -100000) || (diff > 100000)) {
 				stabilized = false;
 			}else if(stabilized) {
-				diff = diff > 2000 ? 2000
-								   : diff < -2000 ? -2000
+				diff = diff > 5000 ? 5000
+								   : diff < -5000 ? -5000
 												  : diff;
 			}
 			diffPts = static_cast<int64_t>(diff);

@@ -66,6 +66,7 @@ bool AVfileContext::openFile(const std::string& path, PlayingMode playingMode, i
 				avcodec_free_context(&videoCodecContext);
 				return false;
 			}
+			videoCodecContext->thread_count = 4;
 			if(avcodec_open2(videoCodecContext, avcodec, nullptr) < 0) {
 				avcodec_free_context(&videoCodecContext);
 				return false;
@@ -515,6 +516,7 @@ bool AVfileContext::repeat() {
 				avcodec_free_context(&videoCodecContext);
 				return false;
 			}
+			videoCodecContext->thread_count = 4;
 			if(avcodec_open2(videoCodecContext, avcodec, nullptr) < 0) {
 				avcodec_free_context(&videoCodecContext);
 				return false;
